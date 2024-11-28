@@ -1,0 +1,35 @@
+Marker	perl Marker_blat-v2.pl PathogenMarker-v6.fasta /home/zhangwen/project/2024Water/Data/Aquatic/Genome/						
+	perl Bacteria_marker_stat.pl Sample.info Bacteria_marker.stat >Bacteria_marker.stat.v2						
+							
+Bracken	perl Bracken_cat.pl Sample.info /home/zhangwen/project/2024Water/Analysis/Bacteria/Bracken/*.report.bracken.genus >Water_bracken.cat						
+	Rscript meta.R -i Country.genus -m Country.group -c 20 -t 0.01  -o Country						
+							
+							
+VFF	perl Target_sh.pl ../Sample.info VFF_from_PULSENET.fa						
+	perl Bowtie_stat.pl ./ 50 VFF.stat					按90%的标准，无比对结果；50%标准，3个比对结果	
+Res	perl Bowtie_stat.pl Res/ 90 Res.cat.90						
+	perl Res_Report.pl Res.cat.90 Sample.info						
+							
+PathogenGenome	perl Target_sh.pl Sample.info /home/zhangwen/Data/2023Genome_Database/PathogenCore_genome.fasta						运行中
+							
+							
+已知Virus	perl Virus_sh.pl Sample.info						
+	perl Bowtie_stat_virus.pl bowtie/ 90 Virus.stat						
+							
+未知Virus	docker run -it --previleged=True -v /home/zhangwen:/test genomad:v1						
+用genomad预测virus	genomad end-to-end --cleanup --splits 8  '/test/project/2024Water//Data/WasteWater/Genome/ERZ795019.fasta' 'Out' /test/Data/genomad/genomad_db						
+	cat ../Wastewater_genomad/Out/*_summary/*_virus_summary.tsv >Wastewater_genomad_virus_summary.tsv						
+	cat ../Wastewater_genomad/Out/*_summary/*_virus.fna >Wastewater_genomad_virus.fna						
+	conda activate checkv						
+	export CHECKVDB=/home/zhangwen/Data/CheckV/checkv-db-v1.0						
+用checkv检测完整度	checkv end_to_end Aquatic_wastewater_genomad_virus.fna CheckV_out -t 16						
+							
+合并checkv和genomad结果后，开始galah	perl Prepare_for_Galah.pl CheckV_out/quality_summary.tsv Aquatic_wastewater_genomad_virus.fna /home/zhangwen/project/2024Water/Analysis/Noval_Virus/Virus_seq/ >Virus_seq.list						运行中
+	cat DRMvirus.list Virus_seq.list >galah.list						
+	galah cluster --genome-fasta-list galah.list --ani 97 --min-aligned-fraction 70 --output-cluster-definition clusters.tsv  --output-representative-fasta-directory-copy New						包含ref virus
+	perl galah_stat.pl clusters.tsv						
+	docker run --privileged=true -it -v /home/zhangwen/project/2024Water/Analysis/Noval_Virus:/test aniclustermap:v1						
+	galah cluster --genome-fasta-list Virus_seq.list --ani 97 --min-aligned-fraction 70 --output-cluster-definition clusters-v2.tsv  --output-representative-fasta-directory-copy New-v2						仅测序所得virus
+	docker run --privileged=true -it -v /home/zhangwen/project/2024Water/Analysis/Noval_Virus:/test aniclustermap:v1						
+	ANIclustermap -i New-v2/ -o ./ --annotation						
+	perl galah_stat-v2.pl clusters-v2.tsv Aquatic_wastewater_genomad_virus_summary.tsv						
